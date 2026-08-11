@@ -95,6 +95,18 @@ type listResponse struct {
 	Data  []Link `json:"data"`
 }
 
+type userResponse struct {
+	Domains []Domain `json:"domains"`
+}
+
+type Domain struct {
+	ID        string    `json:"id"`
+	Address   string    `json:"address"`
+	Banned    bool      `json:"banned"`
+	Homepage  string    `json:"homepage"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 func doJSON(cfg *Config, method, path string, body io.Reader, out any) (int, error) {
 	req, err := http.NewRequest(method, cfg.Host+path, body)
 	if err != nil {
@@ -155,7 +167,7 @@ func cmdSetup(args []string) error {
 
 func cmdSubmit(cfg *Config, args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: kutt submit <url> [-c custom] [-p password] [-r]")
+		return fmt.Errorf("usage: kutt submit <url> [-c custom] [-p password] [-r] [-d domain]")
 	}
 	target := args[0]
 
@@ -174,6 +186,12 @@ func cmdSubmit(cfg *Config, args []string) error {
 				return fmt.Errorf("%s requires a value", args[i-1])
 			}
 			payload["password"] = args[i]
+		case "-d", "--domain":
+			i++
+			if i >= len(args) {
+				return fmt.Errorf("%s requires a value", args[i-1])
+			}
+			payload["domain"] = args[i]
 		case "-r", "--reuse":
 			payload["reuse"] = true
 		default:
@@ -240,6 +258,25 @@ func cmdList(cfg *Config, args []string) error {
 	return nil
 }
 
+func cmdDomains(cfg *Config) error {
+	var u userResponse
+	if _, err := doJSON(cfg, http.MethodGet, "/api/users", nil, &u); err != nil {
+		return err
+	}
+	if len(u.Domains) == 0 {
+		fmt.Println("No custom domains configured. Default domain will be used.")
+		return nil
+	}
+	for _, d := range u.Domains {
+		status := "active"
+		if d.Banned {
+			status = "banned"
+		}
+		fmt.Printf("%-30s %s\n", d.Address, status)
+	}
+	return nil
+}
+
 func cmdDelete(cfg *Config, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: kutt delete <id>")
@@ -260,8 +297,9 @@ func usage() {
 
 Usage:
   kutt setup --host <url> --apikey <key>   save config to ~/.kutt
-  kutt submit <url> [-c custom] [-p password] [-r]   shorten a URL
+  kutt submit <url> [-c custom] [-p password] [-r] [-d domain]   shorten a URL
   kutt list [-n limit]                     list recent links
+  kutt domains                             list configured domains
   kutt delete <id>                         delete a link
 
 Config: ~/.kutt (host= / apikey=) or env KUTT_HOST, KUTT_API_KEY.
@@ -282,7 +320,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(1)
 		}
-	case "submit", "list", "delete":
+	case "submit", "list", "domains", "delete":
 		cfg, err := loadConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
@@ -294,6 +332,8 @@ func main() {
 			runErr = cmdSubmit(cfg, args)
 		case "list":
 			runErr = cmdList(cfg, args)
+		case "domains":
+			runErr = cmdDomains(cfg)
 		case "delete":
 			runErr = cmdDelete(cfg, args)
 		}
