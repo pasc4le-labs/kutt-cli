@@ -25,10 +25,13 @@ A legacy `~/.kutt` containing only a bare API key is still read.
 ## Usage
 
 ```
-kutt submit <url> [-c custom] [-p password] [-r]   shorten a URL (prints the short link)
+kutt submit <url> [-c custom] [-p password] [-r] [-d domain]   shorten a URL (prints the short link)
 kutt list [-n limit]                               list recent links
+kutt domains                                       list configured domains
 kutt delete <id>                                   delete a link
 ```
+
+`submit` with `-d r.peppe.dev` shortens on that custom domain; without it, Kutt's default domain is used.
 
 ## API
 
